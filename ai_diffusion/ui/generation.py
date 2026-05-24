@@ -42,20 +42,19 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
-from ..backend.api import InpaintContext
-from ..backend.resources import Arch
-from ..backend.workflow import FillMode, InpaintMode
 from ..image import Bounds, Extent, Image
+from ..jobs import Job, JobKind, JobParams, JobQueue, JobState
 from ..localization import translate as _
-from ..model.jobs import Job, JobKind, JobParams, JobQueue, JobState
-from ..model.model import DocumentModel, ProgressKind, Workspace
-from ..model.properties import Bind, Binding, bind, bind_combo, bind_toggle
-from ..model.region import RootRegion
-from ..model.root import root
+from ..model import InpaintContext, Model, ProgressKind, RootRegion, Workspace
+from ..properties import Bind, Binding, bind, bind_combo, bind_toggle
+from ..resources import Arch
+from ..root import root
 from ..settings import settings
 from ..style import Styles
 from ..util import ensure, flatten, sequence_equal
+from ..workflow import FillMode, InpaintMode
 from . import theme
+from .layout_regions import LayoutRegionWidget
 from .region import RegionPromptWidget
 from .widget import (
     ErrorBox,
@@ -70,7 +69,7 @@ from .widget import (
 
 
 class HistoryWidget(QListWidget):
-    _model: DocumentModel
+    _model: Model
     _connections: list[QMetaObject.Connection]
     _last_job_params: JobParams | None = None
 
@@ -136,7 +135,7 @@ class HistoryWidget(QListWidget):
         return self._model
 
     @model_.setter
-    def model_(self, model: DocumentModel):
+    def model_(self, model: Model):
         Binding.disconnect_all(self._connections)
         self._model = model
         jobs = model.jobs
@@ -569,7 +568,7 @@ class AnimatedListItem(QListWidgetItem):
 
 
 class CustomInpaintWidget(QWidget):
-    _model: DocumentModel
+    _model: Model
     _model_bindings: list[QMetaObject.Connection | Binding]
 
     def __init__(self, parent: QWidget):
@@ -640,7 +639,7 @@ class CustomInpaintWidget(QWidget):
         return self._model
 
     @model.setter
-    def model(self, model: DocumentModel):
+    def model(self, model: Model):
         if self._model != model:
             Binding.disconnect_all(self._model_bindings)
             self._model = model
@@ -710,7 +709,7 @@ class ProgressBar(QProgressBar):
         return self._model
 
     @model.setter
-    def model(self, model: DocumentModel):
+    def model(self, model: Model):
         if self._model != model:
             Binding.disconnect_all(self._model_bindings)
             self._model = model
@@ -738,7 +737,7 @@ class ProgressBar(QProgressBar):
 class GenerationWidget(QWidget):
     def __init__(self):
         super().__init__()
-        self._model: DocumentModel = root.active_model
+        self._model: Model = root.active_model
         self._model_bindings: list[QMetaObject.Connection | Binding] = []
 
         layout = QVBoxLayout(self)
@@ -755,6 +754,9 @@ class GenerationWidget(QWidget):
 
         self.region_prompt = RegionPromptWidget(self)
         layout.addWidget(self.region_prompt)
+
+        self.layout_regions = LayoutRegionWidget(self)
+        layout.addWidget(self.layout_regions)
 
         self.strength_slider = StrengthWidget(parent=self)
         self.layer_count_widget = LayerCountWidget(self)
@@ -826,7 +828,7 @@ class GenerationWidget(QWidget):
         return self._model
 
     @model.setter
-    def model(self, model: DocumentModel):
+    def model(self, model: Model):
         if self._model != model:
             Binding.disconnect_all(self._model_bindings)
             self._model = model
@@ -852,6 +854,7 @@ class GenerationWidget(QWidget):
                 self.generate_button.ctrl_clicked.connect(model.generate_replace),
             ]
             self.region_prompt.regions = model.active_regions
+            self.layout_regions.model = model
             self.custom_inpaint.model = model
             self.generate_button.model = model
             self.queue_button.model = model

@@ -211,6 +211,55 @@ class Settings(QObject):
     server_authorization: str
     _server_authorization = Setting("ComfyUI Authorization Token", "")
 
+    comfy_api_key: str
+    _comfy_api_key = Setting(
+        "Comfy API Key",
+        "",
+        "API key used for Comfy Partner/API nodes such as OpenAIChatNode. Required for LLM layout generation.",
+    )
+
+    llm_layout_description: str
+    _llm_layout_description = Setting(
+        "Layout Squirrel Description",
+        "a pink fox flying over a blue gorilla",
+        "Default placement description for Layout Squirrel region planning.",
+    )
+
+    llm_layout_tags: str
+    _llm_layout_tags = Setting(
+        "Layout Squirrel Region Tags",
+        '"fox, pink fur, flying", "gorilla, blue fur, sitting"',
+        "Default comma-separated region prompts for Layout Squirrel.",
+    )
+
+    llm_layout_model: str
+    _llm_layout_model = Setting(
+        "Layout Squirrel Model",
+        "gpt-5-nano",
+        "Default Comfy Partner OpenAI model used for Layout Squirrel region planning.",
+    )
+
+    llm_layout_default_strength: float
+    _llm_layout_default_strength = Setting(
+        "Layout Squirrel Default Strength",
+        1.0,
+        "Default regional conditioning strength for generated layout regions.",
+    )
+
+    llm_layout_default_feather: float
+    _llm_layout_default_feather = Setting(
+        "Layout Squirrel Default Feather",
+        25.0,
+        "Default regional conditioning feather as a percentage of each region's smaller dimension.",
+    )
+
+    llm_layout_base_prompt: str
+    _llm_layout_base_prompt = Setting(
+        "Layout Squirrel Base Prompt",
+        "duo, white background",
+        "Default prompt common to all regions when starting from a blank prompt.",
+    )
+
     check_server_resources: bool
     _check_server_resources = Setting("Refuse connection if nodes or models are missing", True)
 

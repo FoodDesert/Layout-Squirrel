@@ -28,24 +28,24 @@ from PyQt5.QtWidgets import (
     QStyle,
     QStyleOption,
     QTextEdit,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
 
-from .. import __version__, eventloop, util
-from ..backend import resources
-from ..backend.client import Client, MissingResources, User
-from ..backend.cloud_client import CloudClient
-from ..backend.resources import Arch, ResourceId
-from ..backend.server import Server, ServerState
+from .. import __version__, eventloop, resources, util
+from ..client import Client, MissingResources, User
+from ..cloud_client import CloudClient
+from ..connection import ConnectionState, apply_performance_preset
 from ..localization import Localization
 from ..localization import translate as _
-from ..model.connection import ConnectionState, apply_performance_preset
-from ..model.properties import Binding
-from ..model.root import collect_diagnostics, root
-from ..model.updates import UpdateState
+from ..properties import Binding
+from ..resources import Arch, ResourceId
+from ..root import collect_diagnostics, root
+from ..server import Server, ServerState
 from ..settings import ImageFileFormat, PerformancePreset, ServerMode, Settings, settings
 from ..style import Style
+from ..updates import UpdateState
 from .server import ServerWidget
 from .settings_widgets import (
     ComboBoxSetting,
@@ -317,8 +317,7 @@ class CloudWidget(QWidget):
         if connection.state in [ConnectionState.auth_missing, ConnectionState.auth_error]:
             connection.sign_in()
         else:
-            if client := connection.create_client(settings):
-                connection.connect(client)
+            connection.connect()
 
     def _sign_out(self):
         settings.access_token = ""
@@ -516,6 +515,42 @@ class ConnectionSettings(SettingsTab):
         server_layout.addWidget(self._connect_button)
         connection_layout.addLayout(server_layout)
 
+        add_header(connection_layout, Settings._comfy_api_key)
+        api_key_layout = QHBoxLayout()
+        self._comfy_api_key = QLineEdit(self._connection_widget)
+        self._comfy_api_key.setEchoMode(QLineEdit.EchoMode.Password)
+        self._comfy_api_key.setPlaceholderText(_("Optional: paste a Comfy API key for Partner/API nodes"))
+        self._comfy_api_key.textChanged.connect(self.write)
+        api_key_layout.addWidget(self._comfy_api_key)
+
+        self._comfy_api_help_button = QToolButton(self._connection_widget)
+        self._comfy_api_help_button.setText("?")
+        self._comfy_api_help_button.setCheckable(True)
+        self._comfy_api_help_button.setToolTip(_("Show Comfy API key setup help"))
+        self._comfy_api_help_button.toggled.connect(self._toggle_comfy_api_help)
+        api_key_layout.addWidget(self._comfy_api_help_button)
+        connection_layout.addLayout(api_key_layout)
+
+        self._comfy_api_help = QLabel(self._connection_widget)
+        self._comfy_api_help.setWordWrap(True)
+        self._comfy_api_help.setTextFormat(Qt.TextFormat.RichText)
+        self._comfy_api_help.setTextInteractionFlags(Qt.TextInteractionFlag.TextBrowserInteraction)
+        self._comfy_api_help.setOpenExternalLinks(True)
+        self._comfy_api_help.setVisible(False)
+        self._comfy_api_help.setText(
+            _(
+                "LLM layout generation uses Comfy Partner/API nodes, which require a Comfy "
+                "account API key and sufficient credits. To create a key, sign in at "
+                "<a href='https://platform.comfy.org/login'>platform.comfy.org/login</a>, "
+                "open API Keys, click + New, name the key, click Generate, and copy it "
+                "immediately because it is only shown once. Buy credits from the same "
+                "Comfy account before using paid API nodes. Detailed setup: "
+                "<a href='https://docs.comfy.org/development/comfyui-server/api-key-integration'>"
+                "Comfy Account API Key Integration</a>."
+            )
+        )
+        connection_layout.addWidget(self._comfy_api_help)
+
         self._connection_status = QLabel(self._connection_widget)
         self._supported_workloads = QLabel(self._connection_widget)
         self._supported_workloads.setWordWrap(True)
@@ -572,18 +607,22 @@ class ConnectionSettings(SettingsTab):
         self._server_mode.update_status(root.connection.state, self._server.state)
         self._update_server_mode(settings.server_mode)
         self._server_url.setText(settings.server_url)
+        self._comfy_api_key.setText(settings.comfy_api_key)
 
     def _write(self):
         settings.server_mode = self._server_mode.mode
         settings.server_url = self._server_url.text()
+        settings.comfy_api_key = self._comfy_api_key.text()
 
     def _change_server_mode(self):
         self._update_server_mode(self._server_mode.mode)
         self.write()
 
     def _connect(self):
-        if client := root.connection.create_client(settings):
-            root.connection.connect(client)
+        root.connection.connect()
+
+    def _toggle_comfy_api_help(self, checked: bool):
+        self._comfy_api_help.setVisible(checked)
 
     def update_server_status(self):
         connection = root.connection
@@ -1154,7 +1193,7 @@ class SettingsDialog(QDialog):
         super().__init__()
         type(self)._instance = self
 
-        self.setWindowTitle(_("Configure Image Diffusion"))
+        self.setWindowTitle(_("Configure Layout Squirrel"))
         self.setMinimumSize(QSize(960, 480))
         if screen := QGuiApplication.screenAt(QCursor.pos()):
             size = screen.availableSize()

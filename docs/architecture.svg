@@ -1,0 +1,103 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2100" height="1220" viewBox="0 0 2100 1220">
+  <defs>
+    <marker id="arrow" markerWidth="14" markerHeight="14" refX="12" refY="7" orient="auto" markerUnits="strokeWidth">
+      <path d="M 0 0 L 14 7 L 0 14 z" fill="#3d4754"/>
+    </marker>
+    <marker id="arrowPlanned" markerWidth="14" markerHeight="14" refX="12" refY="7" orient="auto" markerUnits="strokeWidth">
+      <path d="M 0 0 L 14 7 L 0 14 z" fill="#7b5aa6"/>
+    </marker>
+    <style>
+      .bg { fill: #f7f8fb; }
+      .title { font-family: Segoe UI, Arial, sans-serif; font-size: 44px; font-weight: 700; fill: #20242a; }
+      .subtitle { font-family: Segoe UI, Arial, sans-serif; font-size: 25px; fill: #47515f; }
+      .box { fill: #ffffff; stroke: #9aa5b1; stroke-width: 2.5; rx: 18; }
+      .proto { fill: #fff8e8; stroke: #c99335; }
+      .future { fill: #f1ecfb; stroke: #8664b3; }
+      .engine { fill: #eaf4ff; stroke: #4f86bd; }
+      .krita { fill: #eaf8f0; stroke: #4e9a66; }
+      .diffusion { fill: #f8eef4; stroke: #b25b8c; }
+      .boxTitle { font-family: Segoe UI, Arial, sans-serif; font-size: 27px; font-weight: 700; fill: #222833; }
+      .boxText { font-family: Segoe UI, Arial, sans-serif; font-size: 20px; fill: #384252; }
+      .noteText { font-family: Segoe UI, Arial, sans-serif; font-size: 19px; fill: #64512b; font-style: italic; }
+      .futureText { font-family: Segoe UI, Arial, sans-serif; font-size: 19px; fill: #594177; font-style: italic; }
+      .arrow { stroke: #3d4754; stroke-width: 3; fill: none; marker-end: url(#arrow); }
+      .plannedArrow { stroke: #7b5aa6; stroke-width: 3; stroke-dasharray: 10 8; fill: none; marker-end: url(#arrowPlanned); }
+      .protoArrow { stroke: #c99335; stroke-width: 3; stroke-dasharray: 8 8; fill: none; marker-end: url(#arrow); }
+      .laneLabel { font-family: Segoe UI, Arial, sans-serif; font-size: 18px; fill: #697383; font-weight: 700; letter-spacing: 0.5px; }
+    </style>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="2100" height="1220"/>
+  <text class="title" x="80" y="82">Layout Squirrel</text>
+  <text class="subtitle" x="80" y="126">Binding object traits to specific image regions, then letting diffusion generate the image.</text>
+
+  <text class="laneLabel" x="80" y="185">USER INTENT</text>
+  <text class="laneLabel" x="520" y="185">PROTOTYPE INPUTS</text>
+  <text class="laneLabel" x="1010" y="185">LAYOUT PLANNING</text>
+  <text class="laneLabel" x="1460" y="185">KRITA CONTROL</text>
+  <text class="laneLabel" x="1800" y="185">GENERATION</text>
+
+  <rect class="box" x="80" y="230" width="370" height="205"/>
+  <text class="boxTitle" x="110" y="278">Natural language idea</text>
+  <text class="boxText" x="110" y="322">Example:</text>
+  <text class="boxText" x="110" y="354">A pink-furred fox flies</text>
+  <text class="boxText" x="110" y="386">above a blue gorilla.</text>
+
+  <rect class="box proto" x="520" y="205" width="390" height="155"/>
+  <text class="boxTitle" x="550" y="253">Layout description</text>
+  <text class="boxText" x="550" y="298">Where things should go</text>
+  <text class="noteText" x="550" y="330">Prototype-only split input</text>
+
+  <rect class="box proto" x="520" y="405" width="390" height="190"/>
+  <text class="boxTitle" x="550" y="453">Region tag groups</text>
+  <text class="boxText" x="550" y="498">"fox, pink fur, flying"</text>
+  <text class="boxText" x="550" y="530">"gorilla, blue fur, sitting"</text>
+  <text class="noteText" x="550" y="566">Manual in current prototype</text>
+
+  <rect class="box future" x="290" y="675" width="520" height="190"/>
+  <text class="boxTitle" x="320" y="723">Future tag translation layer</text>
+  <text class="boxText" x="320" y="768">Prompt Squirrel-like tool converts</text>
+  <text class="boxText" x="320" y="800">natural language into region tags</text>
+  <text class="futureText" x="320" y="836">Planned, not implemented yet</text>
+
+  <rect class="box engine" x="1010" y="265" width="370" height="220"/>
+  <text class="boxTitle" x="1040" y="313">LLM layout planner</text>
+  <text class="boxText" x="1040" y="358">Comfy Partner/API node</text>
+  <text class="boxText" x="1040" y="390">Produces strict JSON:</text>
+  <text class="boxText" x="1040" y="422">shape, box, color, depth</text>
+  <text class="noteText" x="1040" y="458">LLM does not render image</text>
+
+  <rect class="box krita" x="1460" y="240" width="350" height="205"/>
+  <text class="boxTitle" x="1490" y="288">Krita vector regions</text>
+  <text class="boxText" x="1490" y="333">Editable masks on canvas</text>
+  <text class="boxText" x="1490" y="365">Move and resize them</text>
+  <text class="boxText" x="1490" y="397">to correct placement</text>
+
+  <rect class="box diffusion" x="1775" y="545" width="305" height="205"/>
+  <text class="boxTitle" x="1830" y="593">Regional prompting</text>
+  <text class="boxText" x="1830" y="638">Binds each prompt</text>
+  <text class="boxText" x="1830" y="670">bundle to its mask</text>
+  <text class="boxText" x="1830" y="702">in ComfyUI/Krita</text>
+
+  <rect class="box diffusion" x="1775" y="850" width="305" height="165"/>
+  <text class="boxTitle" x="1830" y="898">Generated image</text>
+  <text class="boxText" x="1830" y="943">Diffusion renders</text>
+  <text class="boxText" x="1830" y="975">the final result</text>
+
+  <path class="arrow" d="M 450 332 C 480 315, 495 280, 520 280"/>
+  <path class="arrow" d="M 450 332 C 485 380, 492 505, 520 505"/>
+  <path class="arrow" d="M 910 282 C 950 290, 975 330, 1010 350"/>
+  <path class="arrow" d="M 910 500 C 955 480, 980 425, 1010 395"/>
+  <path class="arrow" d="M 1380 375 L 1460 340"/>
+  <path class="arrow" d="M 1635 445 C 1690 500, 1735 570, 1775 640"/>
+  <path class="arrow" d="M 1925 750 L 1925 850"/>
+  <path class="plannedArrow" d="M 290 770 C 235 680, 250 470, 450 332"/>
+  <path class="plannedArrow" d="M 810 770 C 905 690, 930 530, 1010 435"/>
+  <path class="protoArrow" d="M 640 675 C 640 640, 640 615, 640 595"/>
+
+  <rect class="box" x="80" y="940" width="1420" height="210"/>
+  <text class="boxTitle" x="110" y="988">Key idea</text>
+  <text class="boxText" x="110" y="1034">Explicit binding: each object gets its own position and its own trait bundle.</text>
+  <text class="boxText" x="110" y="1068">The model is guided toward “this object, with these traits, belongs here.”</text>
+  <text class="boxText" x="110" y="1102">Editable Krita masks are the visual handle for correcting those bindings before sampling.</text>
+</svg>

@@ -9,7 +9,7 @@ from PyQt5.QtCore import QByteArray, QObject, QTimer, QUuid, pyqtSignal
 from PyQt5.QtGui import QImage
 
 from . import eventloop
-from .image import BlendMode, Bounds, Extent, Image, ImageCollection
+from .image import Bounds, Extent, Image, ImageCollection
 from .util import acquire_elements, ensure, maybe
 from .util import client_logger as log
 
@@ -157,6 +157,7 @@ class Layer(QObject):
             data: QByteArray = self._node.projectionPixelData(*bounds)
         else:
             data: QByteArray = self._node.pixelDataAtTime(*bounds, time)
+        assert data is not None and data.size() >= bounds.extent.pixel_count * 4
         return Image.from_packed_bytes(data, bounds.extent)
 
     def write_pixels(
@@ -171,14 +172,12 @@ class Layer(QObject):
         bounds = bounds or layer_bounds
         if keep_alpha:
             composite = self.get_pixels(bounds)
-            composite.draw_image(img, blend=BlendMode.keep)
+            composite.draw_image(img, keep_alpha=True)
             img = composite
         elif layer_bounds != bounds and not layer_bounds.is_zero:
             # layer.cropNode(*bounds)  <- more efficient, but clutters the undo stack
             blank = Image.create(layer_bounds.extent, fill=0)
             self._node.setPixelData(blank.data, *layer_bounds)
-
-        assert img.extent == bounds.extent, "write_pixels: image size does must match bounds size"
         self._node.setPixelData(img.data, *bounds)
         if make_visible:
             self.is_visible = True
@@ -192,6 +191,7 @@ class Layer(QObject):
                 data: QByteArray = self._node.pixelData(*bounds)
             else:
                 data: QByteArray = self._node.pixelDataAtTime(*bounds, time)
+            assert data is not None and data.size() >= bounds.extent.pixel_count
             return Image.from_packed_bytes(data, bounds.extent, channels=1)
         else:
             img = self.get_pixels(bounds, time)
@@ -349,24 +349,32 @@ class LayerManager(QObject):
     parent_changed = pyqtSignal(Layer)
     removed = pyqtSignal(Layer)
 
+    _doc: krita.Document | None
+    _layers: dict[QUuid, Layer]
+    _active_id: QUuid
+    _last_active: Layer | None = None
+    _timer: QTimer
+    _is_updating: bool = False
+
     def __init__(self, doc: krita.Document | None):
         super().__init__()
         self._doc = doc
-        self._layers: dict[QUuid, Layer] = {}
-        self._active_id = QUuid()
-        self._last_active: Layer | None = None
-        self._timer: QTimer
-        self._is_updating = False
-
+        self._layers = {}
         if doc is not None:
             root = doc.rootNode()
             self._layers = {root.uniqueId(): Layer(self, root)}
             self._active_id = doc.activeNode().uniqueId()
             self.update()
-            self._timer = QTimer(self)
+            self._timer = QTimer()
             self._timer.setInterval(500)
             self._timer.timeout.connect(self.update)
             self._timer.start()
+        else:
+            self._active_id = QUuid()
+
+    def __del__(self):
+        if self._doc is not None:
+            self._timer.stop()
 
     @contextmanager
     def _update_guard(self):
@@ -453,7 +461,7 @@ class LayerManager(QObject):
                 self._last_active = layer
             return ensure(layer, "Active layer not found in layer tree (no fallback)")
         except Exception as e:
-            log.error(f"Error getting active layer: {e!s}")
+            log.error(f"Error getting active layer: {e}")
             return self.root
 
     @active.setter
@@ -491,14 +499,25 @@ class LayerManager(QObject):
             parent.node.addChildNode(node, above.node if above else None)
             return self.updated().wrap(node)
 
-    def create_vector(self, name: str, svg: str):
+    def create_vector(
+        self,
+        name: str,
+        svg: str,
+        make_active=True,
+        parent: Layer | None = None,
+        above: Layer | None = None,
+    ):
         doc = ensure(self._doc)
         node = doc.createVectorLayer(name)
-        doc.rootNode().addChildNode(node, None)
-        node.addShapesFromSvg(svg)
-        layer = self.updated().wrap(node)
-        layer.refresh()
-        return layer
+        parent_node = parent.node if parent else doc.rootNode()
+        with RestoreActiveLayer(self) if not make_active else nullcontext():
+            parent_node.addChildNode(node, above.node if above else None)
+            node.addShapesFromSvg(svg)
+            layer = self.updated().wrap(node)
+            layer.refresh()
+            if make_active:
+                self.active = layer
+            return layer
 
     def create_mask(self, name: str, img: Image, bounds: Bounds, parent: Layer | None = None):
         assert img.is_mask
@@ -507,10 +526,10 @@ class LayerManager(QObject):
         node.setPixelData(img.data, *bounds)
         return self._insert(node, parent=parent)
 
-    def create_group(self, name: str, above: Layer | None = None):
+    def create_group(self, name: str, above: Layer | None = None, make_active=True):
         doc = ensure(self._doc)
         node = doc.createGroupLayer(name)
-        return self._insert(node, above)
+        return self._insert(node, above, make_active=make_active)
 
     def create_group_for(self, layer: Layer):
         doc = ensure(self._doc)
@@ -521,13 +540,13 @@ class LayerManager(QObject):
         group_node.addChildNode(layer.node, None)
         return self.wrap(group_node)
 
-    def update_layer_image(self, layer: Layer, image: Image, bounds: Bounds, blend=BlendMode.alpha):
+    def update_layer_image(self, layer: Layer, image: Image, bounds: Bounds, keep_alpha=False):
         """Update layer pixel data by creating a new layer to allow undo."""
         layer_bounds = layer.bounds
-        if blend is not BlendMode.keep:
+        if not keep_alpha:
             layer_bounds = Bounds.union(layer_bounds, bounds)
         content = layer.get_pixels(layer_bounds)
-        content.draw_image(image, bounds.relative_to(layer_bounds).offset, blend=blend)
+        content.draw_image(image, bounds.relative_to(layer_bounds).offset, keep_alpha=keep_alpha)
         replacement = self.create(layer.name, content, layer_bounds, above=layer)
         layer.remove_later()
         return replacement

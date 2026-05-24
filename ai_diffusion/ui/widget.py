@@ -47,23 +47,22 @@ from PyQt5.QtWidgets import (
     QWidgetAction,
 )
 
-from ..backend.client import filter_supported_styles, resolve_arch
-from ..backend.workflow import apply_strength, snap_to_percent
+from ..client import filter_supported_styles, resolve_arch
+from ..connection import ConnectionState
+from ..jobs import JobKind, JobState
 from ..localization import translate as _
-from ..model.connection import ConnectionState
-from ..model.jobs import JobKind, JobState
-from ..model.model import (
-    DocumentModel,
+from ..model import (
     Error,
     ErrorKind,
+    Model,
     ProgressKind,
     QueueMode,
     SamplingQuality,
     Workspace,
     no_error,
 )
-from ..model.properties import Bind, Binding, bind, bind_combo
-from ..model.root import root
+from ..properties import Bind, Binding, bind, bind_combo
+from ..root import root
 from ..settings import Settings, settings
 from ..style import Style, Styles, sort_recent_styles
 from ..text import (
@@ -79,13 +78,14 @@ from ..text import (
     str_index_to_char16_index,
 )
 from ..util import ensure
+from ..workflow import apply_strength, snap_to_percent
 from . import actions, theme
 from .autocomplete import PromptAutoComplete
 from .theme import SignalBlocker
 
 
 class QueuePopup(QMenu):
-    _model: DocumentModel
+    _model: Model
     _connections: list[QMetaObject.Connection]
 
     def __init__(self, supports_batch=True, parent: QWidget | None = None):
@@ -203,7 +203,7 @@ class QueuePopup(QMenu):
         return self._model
 
     @model.setter
-    def model(self, model: DocumentModel):
+    def model(self, model: Model):
         Binding.disconnect_all(self._connections)
         self._model = model
         self._randomize_seed.setEnabled(model.fixed_seed)
@@ -279,7 +279,7 @@ class QueueButton(QToolButton):
         return self._model
 
     @model.setter
-    def model(self, model: DocumentModel):
+    def model(self, model: Model):
         if self._model != model:
             Binding.disconnect_all(self._connections)
             self._model = model
@@ -693,9 +693,9 @@ class TextPromptWidget(QPlainTextEdit):
 
 
 class StrengthSnapping:
-    model: DocumentModel
+    model: Model
 
-    def __init__(self, model: DocumentModel):
+    def __init__(self, model: Model):
         self.model = model
 
     def get_steps(self) -> tuple[int, int]:
@@ -743,7 +743,7 @@ class StrengthSpinBox(QSpinBox):
 
 
 class StrengthWidget(QWidget):
-    _model: DocumentModel | None = None
+    _model: Model | None = None
     _value: int = 100
 
     value_changed = pyqtSignal(float)
@@ -798,7 +798,7 @@ class StrengthWidget(QWidget):
         return self._model
 
     @model.setter
-    def model(self, model: DocumentModel):
+    def model(self, model: Model):
         if self._model:
             self._model.style_changed.disconnect(self.update_suffix)
             self._model.edit_mode_changed.disconnect(self.update_suffix)

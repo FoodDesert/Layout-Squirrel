@@ -23,12 +23,12 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
-from ..backend.client import filter_supported_styles, resolve_arch
-from ..backend.resources import Arch, ResourceId, ResourceKind, search_paths
-from ..backend.server import Server
+from ..client import filter_supported_styles, resolve_arch
 from ..files import File, FileFilter, FileFormat, FileSource
 from ..localization import translate as _
-from ..model.root import root
+from ..resources import Arch, ResourceId, ResourceKind, search_paths
+from ..root import root
+from ..server import Server
 from ..settings import ServerMode, Setting, settings
 from ..style import SamplerPresets, Style, Styles, StyleSettings
 from . import theme

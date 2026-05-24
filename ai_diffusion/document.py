@@ -134,7 +134,7 @@ class KritaDocument(Document):
         self._current_time: int = 0
 
         self._was_valid = False
-        self._poller = QTimer(self)
+        self._poller = QTimer()
         self._poller.setInterval(20)
         self._poller.timeout.connect(self._poll)
         self._poller.start()
@@ -152,8 +152,6 @@ class KritaDocument(Document):
             if doc.activeNode() is None:
                 return None
             all_docs = acquire_elements(Krita.instance().documents())
-            if doc not in all_docs or not doc.activeNode():
-                return None  # document not fully initialized yet
             id = cls._id_from_annotation(doc)
             for other in all_docs:
                 other_id = cls._id_from_annotation(other)
@@ -176,10 +174,6 @@ class KritaDocument(Document):
         return None
 
     @property
-    def id(self):
-        return self._id
-
-    @property
     def extent(self):
         return Extent(self._doc.width(), self._doc.height())
 
@@ -193,12 +187,22 @@ class KritaDocument(Document):
 
     def check_color_mode(self):
         model = self._doc.colorModel()
-        msg_fmt = _("Incompatible document: Color {0} must be {1} (current {0}: {2})")
         if model != "RGBA":
-            return False, msg_fmt.format("model", "RGB/Alpha", model)
+            return False, _(
+                "Incompatible document: Layout Squirrel requires an RGB/Alpha, "
+                "8-bit integer document. Current color model is {0}. To fix this, "
+                "use Image > Convert Image Color Space... and choose Model: "
+                "RGB/Alpha and Depth: 8-bit integer/channel. Converting from CMYK "
+                "may change print colors, so save a copy first if needed."
+            ).format(model)
         depth = self._doc.colorDepth()
         if depth != "U8":
-            return False, msg_fmt.format("depth", "8-bit integer", depth)
+            return False, _(
+                "Incompatible document: Layout Squirrel requires an RGB/Alpha, "
+                "8-bit integer document. Current color depth is {0}. To fix this, "
+                "use Image > Convert Image Color Space... and choose Model: "
+                "RGB/Alpha and Depth: 8-bit integer/channel."
+            ).format(depth)
         return True, None
 
     def create_mask_from_selection(self, mod: SelectionModifiers):
@@ -293,10 +297,7 @@ class KritaDocument(Document):
 
     @property
     def is_valid(self):
-        # can be a document that has been closed, or one that hasn't finished initializing
-        return self._doc.activeNode() is not None and self._doc in acquire_elements(
-            Krita.instance().documents()
-        )
+        return self._doc in acquire_elements(Krita.instance().documents())
 
     @property
     def is_active(self):
@@ -350,7 +351,7 @@ class PoseLayers:
 
     def update(self):
         doc = KritaDocument.active_instance()
-        if not doc or not doc.is_valid:
+        if not doc:
             return
         try:
             layer = doc.layers.active

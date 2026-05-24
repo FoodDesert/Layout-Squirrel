@@ -3,7 +3,6 @@ from __future__ import annotations
 import struct
 import zlib
 from collections.abc import Callable, Iterable
-from enum import Enum
 from math import sqrt
 from pathlib import Path
 from typing import NamedTuple, SupportsIndex
@@ -301,12 +300,6 @@ def qt_supports_webp():
     return _qt_supports_webp
 
 
-class BlendMode(Enum):
-    alpha = 1  # alpha compositing (src over dst)
-    keep = 2  # keep dst alpha, replace RGB (dst atop src)
-    replace = 3  # replace dst with src
-
-
 class Image:
     def __init__(self, qimage: QImage):
         self._qimage = qimage
@@ -326,16 +319,8 @@ class Image:
         return img
 
     @staticmethod
-    def from_packed_bytes(data: QByteArray, extent: Extent, channels: int | None = None):
-        if channels is None:
-            channels = 4 if len(data) == extent.pixel_count * 4 else 1
+    def from_packed_bytes(data: QByteArray, extent: Extent, channels=4):
         assert channels in {4, 1}
-        expected_size = extent.pixel_count * channels
-        if len(data) != expected_size:
-            raise ValueError(
-                f"Can't read image: data size {len(data)} does not match expected size {expected_size}."
-                " Only 8-bit/channel image formats are supported."
-            )
         stride = extent.width * channels
         format = QImage.Format.Format_ARGB32 if channels == 4 else QImage.Format.Format_Grayscale8
         qimg = QImage(data, extent.width, extent.height, stride, format)
@@ -344,17 +329,6 @@ class Image:
     @staticmethod
     def copy(image: Image):
         return Image(QImage(image._qimage))
-
-    @staticmethod
-    def flatten(layer_stack: Iterable[Image]):
-        base = None
-        for layer in layer_stack:
-            if base is None:
-                base = Image.copy(layer)
-            else:
-                base.draw_image(layer)
-        assert base is not None, "No images passed to flatten"
-        return base
 
     @property
     def width(self):
@@ -501,6 +475,17 @@ class Image:
         return cls._mask_op(lhs, rhs, QPainter.CompositionMode.CompositionMode_SourceOver)
 
     @staticmethod
+    def mask_threshold(mask: Image, threshold=0):
+        assert mask.is_mask
+        result = mask._qimage.copy()
+        ptr = result.bits()
+        assert ptr is not None, "Accessing data of invalid image"
+        data = ptr.asarray(result.byteCount())
+        for i in range(result.byteCount()):
+            data[i] = 255 if data[i] > threshold else 0
+        return Image(result)
+
+    @staticmethod
     def compare(img_a: Image, img_b: Image):
         assert extent_equal(img_a._qimage, img_b._qimage)
         import numpy as np
@@ -608,19 +593,6 @@ class Image:
     def to_icon(self):
         return QIcon(self.to_pixmap())
 
-    def to_packed_bytes(self):
-        self.to_krita_format()
-        w, h = self.extent
-        c = 4 if self.is_rgba else 1
-        bits = self._qimage.constBits()
-        assert bits is not None, "Accessing data of invalid image"
-        ptr = bits.asarray(w * h * c)
-        buf = bytearray()
-        for i in range(h):
-            row_start = i * self._qimage.bytesPerLine()
-            buf += bytes(ptr[row_start : row_start + w * c])
-        return QByteArray(bytes(buf))
-
     def to_pil(self):
         from PIL import Image as PILImage
 
@@ -637,12 +609,10 @@ class Image:
         assert self.is_mask
         return Mask(bounds or Bounds(0, 0, *self.extent), self._qimage)
 
-    def draw_image(self, image: Image, offset: tuple[int, int] = (0, 0), blend=BlendMode.alpha):
+    def draw_image(self, image: Image, offset: tuple[int, int] = (0, 0), keep_alpha=False):
         mode = QPainter.CompositionMode.CompositionMode_SourceOver
-        if blend == BlendMode.keep:
+        if keep_alpha:
             mode = QPainter.CompositionMode.CompositionMode_SourceAtop
-        elif blend == BlendMode.replace:
-            mode = QPainter.CompositionMode.CompositionMode_Source
         painter = QPainter(self._qimage)
         painter.setCompositionMode(mode)
         painter.drawImage(*offset, image._qimage)
