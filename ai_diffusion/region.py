@@ -2,16 +2,17 @@ from __future__ import annotations
 
 from enum import Enum
 
-from PyQt5.QtCore import QMetaObject, QObject, QUuid, pyqtSignal
+from PyQt5.QtCore import QMetaObject, QObject, Qt, QUuid, pyqtSignal
 
 from . import eventloop, model, workflow
-from .api import ConditioningInput, RegionInput
+from .api import ConditioningInput, ControlInput, RegionInput
 from .client import Client
 from .control import ControlLayerList
 from .document import Layer, LayerType
 from .image import Bounds, Extent, Image
 from .jobs import JobRegion
 from .properties import ObservableProperties, Property
+from .resources import ControlMode
 from .settings import settings
 from .style import Style
 
@@ -441,6 +442,7 @@ def process_regions(
     layer_regions = [(l, r) for l, r in layer_regions if r is not None]
     if len(layer_regions) == 0:
         return result, job_info
+    _add_layout_squirrel_color_hint(result, layer_regions, bounds)
 
     # Get region masks. Filter out regions with:
     # * no content (empty mask)
@@ -517,3 +519,36 @@ def _uses_full_strength_mask(layer: Layer, region: Region):
     return region.full_strength_mask or (
         parent is not None and parent.name.startswith(("Layout Squirrel Regions", "LLM Layout Regions"))
     )
+
+
+def _is_layout_squirrel_layer(layer: Layer):
+    if layer.name.startswith(("Layout Squirrel Regions", "LLM Layout Regions")):
+        return True
+    parent = layer.parent_layer
+    while parent is not None and not parent.is_root:
+        if parent.name.startswith(("Layout Squirrel Regions", "LLM Layout Regions")):
+            return True
+        parent = parent.parent_layer
+    return False
+
+
+def _add_layout_squirrel_color_hint(
+    result: ConditioningInput,
+    layer_regions: list[tuple[Layer, Region]],
+    bounds: Bounds,
+):
+    strength = settings.llm_layout_color_hint_strength
+    if strength <= 0:
+        return
+
+    hint = Image.create(bounds.extent, fill=Qt.GlobalColor.white)
+    used_hint = False
+    for layer, _region in layer_regions:
+        if not _is_layout_squirrel_layer(layer):
+            continue
+        pixels = layer.get_pixels(bounds)
+        hint.draw_image(pixels)
+        used_hint = True
+
+    if used_hint:
+        result.control.append(ControlInput(ControlMode.composition, hint, strength))

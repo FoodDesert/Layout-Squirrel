@@ -8,7 +8,7 @@ from PyQt5.QtWidgets import (
     QComboBox,
     QDoubleSpinBox,
     QFrame,
-    QHBoxLayout,
+    QGridLayout,
     QLabel,
     QLineEdit,
     QPlainTextEdit,
@@ -59,7 +59,7 @@ class LayoutRegionWidget(QFrame):
         self.tags = QLineEdit(self)
         self.tags.setPlaceholderText(
             _(
-                'Region prompts, comma-separated. Use quotes for commas, e.g. '
+                'Region tags, comma-separated. Use quotes for commas, e.g. '
                 '"red fox, orange fur", "domestic cat, grey fur"'
             )
         )
@@ -94,6 +94,17 @@ class LayoutRegionWidget(QFrame):
         )
         self.default_feather.valueChanged.connect(self._save_defaults)
 
+        self.color_hint = QDoubleSpinBox(self)
+        self.color_hint.setDecimals(2)
+        self.color_hint.setRange(0.0, 1.0)
+        self.color_hint.setSingleStep(0.05)
+        self.color_hint.setValue(settings.llm_layout_color_hint_strength)
+        self.color_hint.setSuffix("x")
+        self.color_hint.setToolTip(
+            _("Strength of weak region-color composition hint; 0 disables it")
+        )
+        self.color_hint.valueChanged.connect(self._save_defaults)
+
         self.generate_button = QPushButton(_("Generate Layout"), self)
         self.generate_button.clicked.connect(self.generate_layout)
 
@@ -101,11 +112,19 @@ class LayoutRegionWidget(QFrame):
         self.status.setWordWrap(True)
         self.status.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
 
-        controls = QHBoxLayout()
-        controls.addWidget(self.model_select)
-        controls.addWidget(self.default_strength)
-        controls.addWidget(self.default_feather)
-        controls.addWidget(self.generate_button)
+        controls = QGridLayout()
+        controls.setContentsMargins(0, 0, 0, 0)
+        controls.setHorizontalSpacing(6)
+        controls.setVerticalSpacing(2)
+        controls.addWidget(QLabel(_("LLM"), self), 0, 0)
+        controls.addWidget(QLabel(_("Prompt weight"), self), 0, 1)
+        controls.addWidget(QLabel(_("Mask feather"), self), 0, 2)
+        controls.addWidget(QLabel(_("Color hint"), self), 0, 3)
+        controls.addWidget(self.model_select, 1, 0)
+        controls.addWidget(self.default_strength, 1, 1)
+        controls.addWidget(self.default_feather, 1, 2)
+        controls.addWidget(self.color_hint, 1, 3)
+        controls.addWidget(self.generate_button, 1, 4)
 
         layout = QVBoxLayout()
         layout.setContentsMargins(4, 4, 4, 4)
@@ -133,6 +152,7 @@ class LayoutRegionWidget(QFrame):
         settings.llm_layout_model = self.model_select.currentText()
         settings.llm_layout_default_strength = self.default_strength.value()
         settings.llm_layout_default_feather = self.default_feather.value()
+        settings.llm_layout_color_hint_strength = self.color_hint.value()
         settings.save()
 
     def _apply_base_prompt_default(self):

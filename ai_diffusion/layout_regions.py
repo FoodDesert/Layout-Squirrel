@@ -81,7 +81,10 @@ Rules:
 - Supported shape values are "rect" and "ellipse".
 - box is [x_min, y_min, width, height] in normalized coordinates.
 - z_index is visual depth: lower values are farther back, higher values are closer.
-- display_color is a hex color for the Krita guide only; it does not affect generation.
+- display_color is a hex color representing the approximate dominant visible color implied by the region tags.
+- Use explicit color tags when present: for "squirrel, pink fur", choose pink rather than averaging squirrel colors.
+- If the region tags do not include an explicit color, infer a plausible average color for the object or background.
+- The same display_color is used for the Krita guide and may be used as a weak generation color hint.
 - Background regions such as sky, ground, water, wall, forest, or mountains should usually be large and far back.
 - Related object parts may touch or overlap if that helps composition.
 
