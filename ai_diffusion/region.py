@@ -5,14 +5,13 @@ from enum import Enum
 from PyQt5.QtCore import QMetaObject, QObject, Qt, QUuid, pyqtSignal
 
 from . import eventloop, model, workflow
-from .api import ConditioningInput, ControlInput, RegionInput
+from .api import ConditioningInput, RegionInput
 from .client import Client
 from .control import ControlLayerList
 from .document import Layer, LayerType
 from .image import Bounds, Extent, Image
 from .jobs import JobRegion
 from .properties import ObservableProperties, Property
-from .resources import ControlMode
 from .settings import settings
 from .style import Style
 
@@ -442,7 +441,6 @@ def process_regions(
     layer_regions = [(l, r) for l, r in layer_regions if r is not None]
     if len(layer_regions) == 0:
         return result, job_info
-    _add_layout_squirrel_color_hint(result, layer_regions, bounds)
 
     # Get region masks. Filter out regions with:
     # * no content (empty mask)
@@ -532,14 +530,21 @@ def _is_layout_squirrel_layer(layer: Layer):
     return False
 
 
-def _add_layout_squirrel_color_hint(
-    result: ConditioningInput,
-    layer_regions: list[tuple[Layer, Region]],
+def get_layout_squirrel_color_hint(
+    root: RootRegion,
     bounds: Bounds,
+    parent_layer: Layer | None = None,
 ):
     strength = settings.llm_layout_color_hint_strength
     if strength <= 0:
-        return
+        return None
+
+    if parent_layer is not None and not parent_layer.is_root:
+        child_layers = parent_layer.child_layers
+    else:
+        child_layers = root.layers.all
+    layer_regions = ((l, root.find_linked(l, RegionLink.direct)) for l in child_layers)
+    layer_regions = [(l, r) for l, r in layer_regions if r is not None]
 
     hint = Image.create(bounds.extent, fill=Qt.GlobalColor.white)
     used_hint = False
@@ -550,5 +555,4 @@ def _add_layout_squirrel_color_hint(
         hint.draw_image(pixels)
         used_hint = True
 
-    if used_hint:
-        result.control.append(ControlInput(ControlMode.composition, hint, strength))
+    return hint if used_hint else None

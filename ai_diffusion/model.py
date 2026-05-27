@@ -57,7 +57,14 @@ from .localization import translate as _
 from .network import NetworkError
 from .pose import Pose
 from .properties import ObservableProperties, Property
-from .region import Region, RegionLink, RootRegion, get_region_inpaint_mask, process_regions
+from .region import (
+    Region,
+    RegionLink,
+    RootRegion,
+    get_layout_squirrel_color_hint,
+    get_region_inpaint_mask,
+    process_regions,
+)
 from .resolution import compute_bounds, compute_relative_bounds
 from .resources import ControlMode
 from .settings import (
@@ -263,8 +270,10 @@ class Model(QObject, ObservableProperties):
         if not dryrun:
             conditioning, job_regions = process_regions(regions, bounds, region_layer)
             conditioning.language = self.prompt_translation_language
+            color_hint = get_layout_squirrel_color_hint(regions, bounds, region_layer)
         else:
             conditioning, job_regions = ConditioningInput("", ""), []
+            color_hint = None
 
         seed = self.seed if self.fixed_seed else workflow.generate_seed()
         if not dryrun:
@@ -276,6 +285,11 @@ class Model(QObject, ObservableProperties):
 
         if mask is not None or workflow_kind is WorkflowKind.refine:
             image = self._get_current_image(bounds) if not dryrun else DummyImage(bounds.extent)
+
+        if color_hint is not None and mask is None and workflow_kind is WorkflowKind.generate:
+            workflow_kind = WorkflowKind.refine
+            image = color_hint
+            strength = _layout_squirrel_color_hint_denoise(settings.llm_layout_color_hint_strength)
 
         if mask is not None:
             if workflow_kind is WorkflowKind.generate:
@@ -1595,6 +1609,11 @@ def _is_llm_layout_layer(layer: Layer):
             return True
         parent = parent.parent_layer
     return False
+
+
+def _layout_squirrel_color_hint_denoise(color_hint_strength: float):
+    color_hint_strength = clamp(color_hint_strength, 0.0, 1.0)
+    return clamp(1.0 - 0.5 * color_hint_strength, 0.5, 1.0)
 
 
 def calc_selection_pre_process(

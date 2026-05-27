@@ -101,7 +101,7 @@ class LayoutRegionWidget(QFrame):
         self.color_hint.setValue(settings.llm_layout_color_hint_strength)
         self.color_hint.setSuffix("x")
         self.color_hint.setToolTip(
-            _("Strength of weak region-color composition hint; 0 disables it")
+            _("Strength of region-color img2img hint; 0 disables it")
         )
         self.color_hint.valueChanged.connect(self._save_defaults)
 
