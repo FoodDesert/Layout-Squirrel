@@ -98,10 +98,9 @@ class LayoutRegionWidget(QFrame):
         self.color_hint.setDecimals(2)
         self.color_hint.setRange(0.0, 1.0)
         self.color_hint.setSingleStep(0.05)
-        self.color_hint.setValue(settings.llm_layout_color_hint_strength)
-        self.color_hint.setSuffix("x")
+        self.color_hint.setValue(settings.llm_layout_color_hint_denoise)
         self.color_hint.setToolTip(
-            _("Strength of region-color img2img hint; 0 disables it")
+            _("Img2img denoise for the region-color hint; lower preserves the color layout more strongly, 1 disables it")
         )
         self.color_hint.valueChanged.connect(self._save_defaults)
 
@@ -119,7 +118,7 @@ class LayoutRegionWidget(QFrame):
         controls.addWidget(QLabel(_("LLM"), self), 0, 0)
         controls.addWidget(QLabel(_("Prompt weight"), self), 0, 1)
         controls.addWidget(QLabel(_("Mask feather"), self), 0, 2)
-        controls.addWidget(QLabel(_("Color hint"), self), 0, 3)
+        controls.addWidget(QLabel(_("Color denoise"), self), 0, 3)
         controls.addWidget(self.model_select, 1, 0)
         controls.addWidget(self.default_strength, 1, 1)
         controls.addWidget(self.default_feather, 1, 2)
@@ -152,7 +151,7 @@ class LayoutRegionWidget(QFrame):
         settings.llm_layout_model = self.model_select.currentText()
         settings.llm_layout_default_strength = self.default_strength.value()
         settings.llm_layout_default_feather = self.default_feather.value()
-        settings.llm_layout_color_hint_strength = self.color_hint.value()
+        settings.llm_layout_color_hint_denoise = self.color_hint.value()
         settings.save()
 
     def _apply_base_prompt_default(self):

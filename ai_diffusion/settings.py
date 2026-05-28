@@ -253,11 +253,11 @@ class Settings(QObject):
         "Default regional conditioning feather as a percentage of each region's smaller dimension.",
     )
 
-    llm_layout_color_hint_strength: float
-    _llm_layout_color_hint_strength = Setting(
-        "Layout Squirrel Color Hint Strength",
-        0.10,
-        "Strength of the weak region-color composition hint. Set to 0 to disable.",
+    llm_layout_color_hint_denoise: float
+    _llm_layout_color_hint_denoise = Setting(
+        "Layout Squirrel Color Hint Denoise",
+        0.95,
+        "Img2img denoise value for the region-color hint. Lower values preserve the color layout more strongly; 1 disables it.",
     )
 
     llm_layout_base_prompt: str

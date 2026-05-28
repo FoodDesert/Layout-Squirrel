@@ -289,7 +289,7 @@ class Model(QObject, ObservableProperties):
         if color_hint is not None and mask is None and workflow_kind is WorkflowKind.generate:
             workflow_kind = WorkflowKind.refine
             image = color_hint
-            strength = _layout_squirrel_color_hint_denoise(settings.llm_layout_color_hint_strength)
+            strength = clamp(settings.llm_layout_color_hint_denoise, 0.0, 1.0)
 
         if mask is not None:
             if workflow_kind is WorkflowKind.generate:
@@ -1609,11 +1609,6 @@ def _is_llm_layout_layer(layer: Layer):
             return True
         parent = parent.parent_layer
     return False
-
-
-def _layout_squirrel_color_hint_denoise(color_hint_strength: float):
-    color_hint_strength = clamp(color_hint_strength, 0.0, 1.0)
-    return clamp(1.0 - 0.5 * color_hint_strength, 0.5, 1.0)
 
 
 def calc_selection_pre_process(

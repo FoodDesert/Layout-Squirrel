@@ -535,8 +535,8 @@ def get_layout_squirrel_color_hint(
     bounds: Bounds,
     parent_layer: Layer | None = None,
 ):
-    strength = settings.llm_layout_color_hint_strength
-    if strength <= 0:
+    denoise = settings.llm_layout_color_hint_denoise
+    if denoise >= 1.0:
         return None
 
     if parent_layer is not None and not parent_layer.is_root:
