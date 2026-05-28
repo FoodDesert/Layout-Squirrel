@@ -546,7 +546,7 @@ def get_layout_squirrel_color_hint(
     layer_regions = ((l, root.find_linked(l, RegionLink.direct)) for l in child_layers)
     layer_regions = [(l, r) for l, r in layer_regions if r is not None]
 
-    hint = Image.create(bounds.extent, fill=Qt.GlobalColor.white)
+    hint = Image.create(bounds.extent, fill=Qt.GlobalColor.transparent)
     used_hint = False
     for layer, _region in layer_regions:
         if not _is_layout_squirrel_layer(layer):
