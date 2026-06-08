@@ -243,7 +243,7 @@ class LayoutRegionWidget(QFrame):
             layer = layers.create_vector(name, svg, make_active=False, parent=group)
             prompt_region = self._model.regions.add_region_for_layer(layer)
             prompt_region.positive = tag
-            prompt_region.conditioning_strength = self.default_strength.value()
+            prompt_region.conditioning_strength = 1.0
             prompt_region.conditioning_feather = self.default_feather.value() / 100
             prompt_region.full_strength_mask = True
         if target_layer is not None:
