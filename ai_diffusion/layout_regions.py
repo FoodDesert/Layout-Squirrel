@@ -15,6 +15,7 @@ class LayoutRegion:
     box: tuple[float, float, float, float]
     z_index: int
     display_color: str
+    hint_colors: tuple[str, ...]
 
 
 class LayoutError(ValueError):
@@ -81,10 +82,12 @@ Rules:
 - Supported shape values are "rect" and "ellipse".
 - box is [x_min, y_min, width, height] in normalized coordinates.
 - z_index is visual depth: lower values are farther back, higher values are closer.
-- display_color is a hex color representing the approximate dominant visible color implied by the region tags.
-- Use explicit color tags when present: for "squirrel, pink fur", choose pink rather than averaging squirrel colors.
+- hint_colors is an ordered list of 1 to 3 hex colors, from most prominent to least prominent, implied by the region tags.
+- display_color must be the first hint_colors color and is used as the Krita guide fill color.
+- Use explicit color tags when present: for "squirrel, pink fur", choose pink as the first hint color rather than averaging squirrel colors.
+- If tags imply multiple important visible colors, include them in hint_colors. For example, red fur and brown clothes should use two colors.
 - If the region tags do not include an explicit color, infer a plausible average color for the object or background.
-- The same display_color is used for the Krita guide and may be used as a weak generation color hint.
+- The hint colors may be used as weak generation color hints.
 - Background regions such as sky, ground, water, wall, forest, or mountains should usually be large and far back.
 - Related object parts may touch or overlap if that helps composition.
 
@@ -97,7 +100,8 @@ JSON schema:
       "shape": "ellipse",
       "box": [0.1, 0.2, 0.35, 0.5],
       "z_index": 10,
-      "display_color": "#d55e00"
+      "display_color": "#d55e00",
+      "hint_colors": ["#d55e00", "#8b5a2b"]
     }}
   ]
 }}
@@ -156,8 +160,9 @@ def validate_layout_response(
 
         box = _coerce_box(item.get("box"), canvas_width, canvas_height, f"Region {i}")
         z_index = _optional_int(item, "z_index", tag_index)
-        color = _coerce_color(item.get("display_color"), tag_index)
-        result.append(LayoutRegion(tag_index, shape, box, z_index, color))
+        hint_colors = _coerce_hint_colors(item.get("hint_colors"), item.get("display_color"), tag_index)
+        color = hint_colors[0]
+        result.append(LayoutRegion(tag_index, shape, box, z_index, color, hint_colors))
 
     missing = [i for i in range(len(tags)) if i not in seen]
     if missing:
@@ -221,5 +226,20 @@ def _coerce_box(value: Any, canvas_width: int, canvas_height: int, context: str)
 
 def _coerce_color(value: Any, tag_index: int) -> str:
     if isinstance(value, str) and re.fullmatch(r"#[0-9a-fA-F]{6}", value):
-        return value
+        return value.lower()
     return _palette[tag_index % len(_palette)]
+
+
+def _coerce_hint_colors(value: Any, display_color: Any, tag_index: int) -> tuple[str, ...]:
+    colors: list[str] = []
+    if isinstance(value, list):
+        for item in value:
+            if isinstance(item, str) and re.fullmatch(r"#[0-9a-fA-F]{6}", item):
+                color = item.lower()
+                if color not in colors:
+                    colors.append(color)
+            if len(colors) >= 3:
+                break
+    if not colors:
+        colors.append(_coerce_color(display_color, tag_index))
+    return tuple(colors)

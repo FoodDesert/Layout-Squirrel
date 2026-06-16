@@ -28,6 +28,7 @@ class ServerBackend(Enum):
     mps = (_("Use MPS (Metal Performance Shader)"), is_macos)
     directml = (_("Use DirectML (GPU)"), is_windows)
     xpu = (_("Use XPU (Intel GPU)"), not is_macos)
+    rocm = (_("Use ROCm (AMD GPU)"), not is_macos)
 
     @staticmethod
     def supported():
@@ -211,25 +212,21 @@ class Settings(QObject):
     server_authorization: str
     _server_authorization = Setting("ComfyUI Authorization Token", "")
 
-    comfy_api_key: str
-    _comfy_api_key = Setting(
-        "Comfy API Key",
-        "",
-        "API key used for Comfy Partner/API nodes such as OpenAIChatNode. Required for LLM layout generation.",
-    )
+    check_server_resources: bool
+    _check_server_resources = Setting("Refuse connection if nodes or models are missing", True)
 
     llm_layout_description: str
     _llm_layout_description = Setting(
         "Layout Squirrel Description",
-        "a pink fox flying over a blue gorilla",
+        "",
         "Default placement description for Layout Squirrel region planning.",
     )
 
     llm_layout_tags: str
     _llm_layout_tags = Setting(
         "Layout Squirrel Region Tags",
-        '"fox, pink fur, flying", "gorilla, blue fur, sitting"',
-        "Default comma-separated region prompts for Layout Squirrel.",
+        "",
+        "Default comma-separated region tags for Layout Squirrel.",
     )
 
     llm_layout_model: str
@@ -242,22 +239,36 @@ class Settings(QObject):
     llm_layout_default_strength: float
     _llm_layout_default_strength = Setting(
         "Layout Squirrel Default Strength",
-        1.0,
+        1.5,
         "Default regional conditioning strength for generated layout regions.",
     )
 
     llm_layout_default_feather: float
     _llm_layout_default_feather = Setting(
         "Layout Squirrel Default Feather",
-        25.0,
+        100.0,
         "Default regional conditioning feather as a percentage of each region's smaller dimension.",
     )
 
     llm_layout_color_hint_denoise: float
     _llm_layout_color_hint_denoise = Setting(
         "Layout Squirrel Color Hint Denoise",
-        0.95,
-        "Img2img denoise value for the region-color hint. Lower values preserve the color layout more strongly; 1 disables it.",
+        0.0,
+        "Legacy internal color-hint control. Layout Squirrel now uses per-region color strength.",
+    )
+
+    llm_layout_color_hint_strength: float
+    _llm_layout_color_hint_strength = Setting(
+        "Layout Squirrel Color Hint Strength",
+        0.5,
+        "Default per-region color hint strength for generated layout regions.",
+    )
+
+    llm_layout_color_hint_mode: str
+    _llm_layout_color_hint_mode = Setting(
+        "Layout Squirrel Color Hint Mode",
+        "latent",
+        "Color hint strategy: pixel uses img2img color dots, latent injects color directions into the initial latent.",
     )
 
     llm_layout_base_prompt: str
@@ -266,9 +277,6 @@ class Settings(QObject):
         "duo, white background",
         "Default prompt common to all regions when starting from a blank prompt.",
     )
-
-    check_server_resources: bool
-    _check_server_resources = Setting("Refuse connection if nodes or models are missing", True)
 
     selection_feather: int
     _selection_feather = Setting(

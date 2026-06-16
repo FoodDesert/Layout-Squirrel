@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+
 import krita
 from krita import DockWidget, Krita
 from PyQt5.QtCore import Qt, pyqtSignal
@@ -13,13 +15,15 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
-from ..connection import ConnectionState
+from .. import eventloop
+from ..backend.server import Server, ServerState
+from ..document import KritaDocument
 from ..localization import translate as _
-from ..model import Model, Workspace
-from ..root import root
-from ..server import Server, ServerState
+from ..model.connection import ConnectionState
+from ..model.model import DocumentModel, Workspace
+from ..model.root import root
+from ..model.updates import UpdateState
 from ..settings import ServerMode, settings
-from ..updates import UpdateState
 from . import theme
 from .animation import AnimationWidget
 from .custom_workflow import CustomWorkflowPlaceholder, CustomWorkflowWidget
@@ -223,7 +227,7 @@ class WelcomeWidget(QWidget):
         header_logo = QLabel(self)
         header_logo.setPixmap(theme.logo().scaled(64, 64))
         header_logo.setMaximumSize(64, 64)
-        header_text = QLabel("Layout\nSquirrel", self)
+        header_text = QLabel("AI Image\nGeneration", self)
         header_text.setStyleSheet("font-size: 12pt")
         header_layout.addWidget(header_logo)
         header_layout.addWidget(header_text)
@@ -275,7 +279,7 @@ class WelcomeWidget(QWidget):
 class ImageDiffusionWidget(DockWidget):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle(_("Layout Squirrel"))
+        self.setWindowTitle(_("AI Image Generation"))
         self._welcome = WelcomeWidget(root.server)
         self._generation = GenerationWidget()
         self._upscaling = UpscaleWidget()
@@ -300,9 +304,14 @@ class ImageDiffusionWidget(DockWidget):
 
     def canvasChanged(self, canvas: krita.Canvas):
         if canvas is not None and canvas.view() is not None:
-            self.update_content()
+            eventloop.run(self._update_active_document())
 
-    def register_model(self, model: Model):
+    async def _update_active_document(self):
+        if not KritaDocument.active():
+            await asyncio.sleep(0.1)  # wait until fully opened/initialized
+        self.update_content()
+
+    def register_model(self, model: DocumentModel):
         model.workspace_changed.connect(self.update_content)
 
     def update_content(self):

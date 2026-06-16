@@ -14,24 +14,15 @@ from PyQt5.QtGui import (
     QPixmap,
     QResizeEvent,
 )
-from PyQt5.QtWidgets import (
-    QDoubleSpinBox,
-    QFrame,
-    QHBoxLayout,
-    QLabel,
-    QMenu,
-    QToolButton,
-    QVBoxLayout,
-    QWidget,
-)
+from PyQt5.QtWidgets import QFrame, QHBoxLayout, QLabel, QMenu, QToolButton, QVBoxLayout, QWidget
 
-from ..client import Client
+from ..backend.client import Client
 from ..document import LayerType
 from ..image import Bounds
 from ..localization import translate as _
-from ..properties import Binding, bind
-from ..region import Region, RegionLink, RootRegion, translate_prompt
-from ..root import root
+from ..model.properties import Binding, bind
+from ..model.region import Region, RegionLink, RootRegion, translate_prompt
+from ..model.root import root
 from ..util import ensure
 from . import theme
 from .control import ControlListWidget
@@ -64,21 +55,6 @@ class InactiveRegionWidget(QFrame):
         layout.setContentsMargins(0, 0, 5, 0)
         layout.addWidget(thumbnail, alignment=Qt.AlignmentFlag.AlignTop)
         layout.addWidget(self._prompt, 1)
-        if isinstance(region, Region):
-            self._weight = QLabel(self)
-            self._weight.setToolTip(_("Regional conditioning strength"))
-            self._weight.setText(f"{region.conditioning_strength:.2f}x")
-            region.conditioning_strength_changed.connect(
-                lambda value: self._weight.setText(f"{value:.2f}x")
-            )
-            layout.addWidget(self._weight)
-            self._feather = QLabel(self)
-            self._feather.setToolTip(_("Regional conditioning feather"))
-            self._feather.setText(f"{region.conditioning_feather * 100:.0f}%")
-            region.conditioning_feather_changed.connect(
-                lambda value: self._feather.setText(f"{value * 100:.0f}%")
-            )
-            layout.addWidget(self._feather)
         self.setLayout(layout)
 
         icon_size = int(1.2 * self.fontMetrics().height())
@@ -142,32 +118,12 @@ class ActiveRegionWidget(QFrame):
         self._remove_button.setAutoRaise(True)
         self._remove_button.setToolTip(_("Remove this region"))
 
-        self._weight_input = QDoubleSpinBox(self)
-        self._weight_input.setDecimals(2)
-        self._weight_input.setRange(0.0, 5.0)
-        self._weight_input.setSingleStep(0.1)
-        self._weight_input.setSuffix("x")
-        self._weight_input.setToolTip(_("Regional conditioning strength"))
-        self._weight_input.setFixedWidth(72)
-
-        self._feather_input = QDoubleSpinBox(self)
-        self._feather_input.setDecimals(0)
-        self._feather_input.setRange(0.0, 200.0)
-        self._feather_input.setSingleStep(5.0)
-        self._feather_input.setSuffix("%")
-        self._feather_input.setToolTip(
-            _("Regional conditioning feather, as a percentage of the region's smaller dimension")
-        )
-        self._feather_input.setFixedWidth(72)
-
         header_layout = QHBoxLayout()
         header_layout.setContentsMargins(0, 0, 2, 0)
         header_layout.setSpacing(0)
         header_layout.addWidget(self._header_icon)
         header_layout.addSpacing(5)
         header_layout.addWidget(self._header_label, 1)
-        header_layout.addWidget(self._weight_input)
-        header_layout.addWidget(self._feather_input)
         header_layout.addWidget(self._link_button)
         header_layout.addWidget(self._remove_button)
 
@@ -278,8 +234,6 @@ class ActiveRegionWidget(QFrame):
             self._root = region.root
             self._bindings = [
                 bind(region, "positive", self.positive, "text"),
-                bind(region, "conditioning_strength", self._weight_input, "value"),
-                self._bind_percent(region, "conditioning_feather", self._feather_input),
                 region.layer_ids_changed.connect(self._update_links),
                 self._link_button.clicked.connect(region.toggle_active_link),
                 self._remove_button.clicked.connect(region.remove),
@@ -299,22 +253,8 @@ class ActiveRegionWidget(QFrame):
         self.positive.move_cursor_to_end()
         self._link_button.setVisible(not is_root_region)
         self._remove_button.setVisible(not is_root_region)
-        self._weight_input.setVisible(isinstance(region, Region))
-        self._feather_input.setVisible(isinstance(region, Region))
         self.positive.setVisible(region is not None)
         self._no_region.setVisible(region is None)
-
-    def _bind_percent(self, region: Region, property: str, widget: QDoubleSpinBox):
-        def set_widget(value):
-            widget.setValue(value * 100)
-
-        def set_model(value):
-            setattr(region, property, value / 100)
-
-        model_to_widget = getattr(region, f"{property}_changed").connect(set_widget)
-        set_widget(getattr(region, property))
-        widget_to_model = widget.valueChanged.connect(set_model)
-        return Binding(model_to_widget, widget_to_model)
 
     def focus(self):
         if not (self.positive.has_focus or self.negative.has_focus):
@@ -598,8 +538,9 @@ class RegionPromptWidget(QWidget):
 
     def _setup_region_bindings(self, region: RootRegion | Region | None):
         region = region or self._regions
-        self._prompt.region = region
-        self._control.model = region.control
+        display_region = self._regions if _is_layout_squirrel_region(region) else region
+        self._prompt.region = display_region
+        self._control.model = display_region.control
         self._show_inactive_regions()
 
     def _add_inactive_region(self, region: RootRegion | Region, layout: QVBoxLayout):
@@ -610,6 +551,8 @@ class RegionPromptWidget(QWidget):
 
     def _show_inactive_regions(self):
         active = self._regions.active_or_root
+        if _is_layout_squirrel_region(active):
+            active = self._regions
 
         for widget in self._inactive_regions:
             widget.deleteLater()
@@ -617,10 +560,16 @@ class RegionPromptWidget(QWidget):
 
         below, above = active.siblings  # sorted from bottom to top
         for region in (r for r in self._regions if r != active and not r.has_links):
+            if _is_layout_squirrel_region(region):
+                continue
             self._add_inactive_region(region, self._regions_above)
         for region in reversed(above):
+            if _is_layout_squirrel_region(region):
+                continue
             self._add_inactive_region(region, self._regions_above)
         for region in reversed(below):
+            if _is_layout_squirrel_region(region):
+                continue
             self._add_inactive_region(region, self._regions_below)
         if not isinstance(active, RootRegion):
             self._add_inactive_region(self._regions, self._regions_below)
@@ -628,6 +577,17 @@ class RegionPromptWidget(QWidget):
     def _activate_region(self, region: RootRegion | Region):
         self._regions.active = region
         self._prompt.focus()
+
+
+def _is_layout_squirrel_region(region: RootRegion | Region | None):
+    if not isinstance(region, Region):
+        return False
+    layer = region.first_layer
+    while layer is not None and not layer.is_root:
+        if layer.name.startswith(("Layout Squirrel Regions", "LLM Layout Regions")):
+            return True
+        layer = layer.parent_layer
+    return False
 
 
 class RegionThumbnailWidget(QLabel):
